@@ -1,0 +1,78 @@
+package com.example.demo.service;
+
+import com.example.demo.bo.CreateStockRequest;
+import com.example.demo.bo.StockResponse;
+import com.example.demo.bo.UpdateStockResponse;
+import com.example.demo.entity.StockEntity;
+import com.example.demo.repository.StockRepository;
+import com.sun.source.tree.IdentifierTree;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+import java.util.stream.StreamSupport;
+
+@Service
+public class StockServiceImpl implements StockService{
+
+    private final StockRepository repository;
+
+    public StockServiceImpl(StockRepository repository) {
+        this.repository = repository;
+    }
+
+    @Override
+    public List<StockEntity> getAllStock() {
+        System.out.println("Getting all stock");
+        // Use stream to turn into a list
+        return StreamSupport.stream(repository.findAll().spliterator(), false).toList();
+    }
+
+    @Override
+    public UpdateStockResponse updateStock(CreateStockRequest request) {
+        System.out.println("Inside update inventory for order " + request);
+
+        UpdateStockResponse orderStatus = new UpdateStockResponse();
+
+        try {
+            Iterable<StockEntity> inventories = repository.findByItem(request.getItem());
+
+            boolean exists = inventories.iterator().hasNext();
+
+            if (!exists) {
+                System.out.println("Stock not exist so reverting the order");
+                throw new Exception("Stock not available");
+            }
+
+            inventories.forEach(i -> {
+                i.setQuantity(i.getQuantity() - request.getQuantity());
+                repository.save(i);
+
+                orderStatus.setItem(i.getItem());
+                orderStatus.setOrderId(i.getId());
+                orderStatus.setRemainingQty(i.getQuantity());
+                orderStatus.setStatus("Success");
+            });
+
+        } catch (Exception e) {
+        }
+
+        return orderStatus;
+    }
+
+    @Override
+    public void addItems(CreateStockRequest stock) {
+        Iterable<StockEntity> items = repository.findByItem(stock.getItem());
+
+        if (items.iterator().hasNext()) {
+            items.forEach(i -> {
+                i.setQuantity(stock.getQuantity() + i.getQuantity());
+                repository.save(i);
+            });
+        } else {
+            StockEntity i = new StockEntity();
+            i.setItem(stock.getItem());
+            i.setQuantity(stock.getQuantity());
+            repository.save(i);
+        }
+    }
+}
